@@ -65,7 +65,7 @@ map <silent> <leader>V :source ~/.vimrc<CR>:filetype detect<CR>:exe ":echo 'vimr
 
 " shortcuts for copying to clipboard
 vmap <leader>y "+y
-nmap <leader>p "*p
+nmap <leader>p "+p
 nmap <leader>Y "+yy
 
 " shortcut to toggle spelling
@@ -198,7 +198,7 @@ imap <F5> <C-R>=strftime("%Y-%m-%d %a %I:%M %p")<CR>
 
 " Show autocomplete menus.
 set wildmenu
-" set wildmode=list:longest
+set wildmode=list:longest
 
 
 " Show editing mode
@@ -351,3 +351,11 @@ nnoremap <leader>1 yypVr=
 " vorax
 let g:vorax_oradoc_open_with = "tabnew | .!w3m '%u'"
 let g:vorax_open_scratch_at_connect = 0
+
+"key mapping for tab navigation
+nmap <Tab> gt
+nmap <S-Tab> gT
+
+"some stuff to get the mouse going in term
+set mouse=a
+set ttymouse=xterm2
