@@ -1,4 +1,5 @@
 call pathogen#runtime_append_all_bundles()
+filetype off
 call pathogen#helptags()
 
 if has("gui_running")
@@ -211,7 +212,7 @@ set sidescrolloff=2
 
 " source $VIMRUNTIME/vimrc_example.vim
 "dbext
-source /home/chris/.vim/plugin/dbext.vim
+source /home/chris/.vim/bundle/dbext/plugin/dbext.vim
 " vmap <leader>se :DBExecRangeSQL
 
 
