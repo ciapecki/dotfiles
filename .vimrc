@@ -31,6 +31,7 @@ set textwidth=79
 set tabstop=2
 set shiftwidth=2
 set softtabstop=2
+set noea  " avoid resizing windows after split
 set cindent
 set autoindent
 set smarttab
@@ -309,11 +310,11 @@ if has("autocmd")
   " (happens when dropping a file on gvim).
   " Also don't do it when the mark is in the first line, that is the default
   " position when opening a file.
-  " autocmd BufReadPost *
-  "   \ if line("'\"") > 1 && line("'\"") <= line("$") |
-  "   \   exe "normal! g`\"" |
-  "   \ endif
-  " 
+  autocmd BufReadPost *
+    \ if line("'\"") > 1 && line("'\"") <= line("$") |
+    \   exe "normal! g`\"" |
+    \ endif
+  
   augroup END
 
 else
@@ -352,6 +353,7 @@ nnoremap <leader>1 yypVr=
 " vorax
 let g:vorax_oradoc_open_with = "tabnew | .!w3m '%u'"
 let g:vorax_open_scratch_at_connect = 0
+let g:vorax_sqlplus_header = "set linesize 10000\nset tab off\nset wrap on\nset ver off\nset flush on\nset colsep \"   \"\nset trimout on\nset trimspool on"
 
 "key mapping for tab navigation
 nmap <Tab> gt
@@ -360,3 +362,6 @@ nmap <S-Tab> gT
 "some stuff to get the mouse going in term
 set mouse=a
 set ttymouse=xterm2
+
+"show marks
+let g:showmarks_enable = 0

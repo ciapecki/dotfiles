@@ -11,6 +11,12 @@ let s:vorax_utils = 1
 
 let s:utils = {}
 
+" Enable logging
+if g:vorax_debug
+  silent! call log#init('ALL', ['~/vorax.log'])
+  silent! let s:log = log#getLogger(expand('<sfile>:t'))
+endif
+
 " print the provided error
 function s:utils.EchoErr(msg) dict
   echohl WarningMsg
@@ -74,6 +80,7 @@ endfunction
 " can be: 'f' for forward, 'b' for backword. It returns an array of 
 " [line, col]
 function s:AdjustPosition(mode)
+  silent! call s:log.trace('start of s:utils.AdjustPosition mode='.a:mode)
   let whichwrap_bak = &whichwrap
   set whichwrap+=<,>,h,l
   if a:mode == 'f'
@@ -84,7 +91,8 @@ function s:AdjustPosition(mode)
       let cl = line(".")
       let line = getline(".")
       let syn = synIDattr(synIDtrans(synID(cl, cc, 1)), "name")  
-      if (syn != 'Comment' && line[cc-1] != ' ' && line[cc-1] != '') || (cc == col('$') && cl == last_line)
+      silent! call s:log.debug('cc='.cc.' cl='.cl.' line='.string(line).' syn='.syn)
+      if (syn != 'Comment' && line[cc-1] != ' ' && cc <= len(line)) || (cc == col('$') && cl == last_line)
         break
       endif
       normal l
@@ -95,7 +103,8 @@ function s:AdjustPosition(mode)
       let cl = line(".")
       let line = getline(".")
       let syn = synIDattr(synIDtrans(synID(cl, cc, 1)), "name")  
-      if (syn != 'Comment' && line[cc-1] != ' ' && line[cc-1] != '') || (cc == 1 && cl == 1)
+      silent! call s:log.debug('cc='.cc.' cl='.cl.' line='.line.' syn='.syn)
+      if (syn != 'Comment' && line[cc-1] != ' ' && cc >= 0) || (cc == 1 && cl == 1)
         break
       endif
       normal h
@@ -113,12 +122,15 @@ endfunction
 " stop_col => the column where the current statement ends
 " statement => the text of the statement
 " relpos => the absolute position of the cursor witin the current statement
-function s:utils.UnderCursorStatement() dict
+function s:utils.UnderCursorStatement(adjust) dict
   silent! call s:log.trace('start of s:utils.UnderCursorStatement')
   let whichwrap_bak = &whichwrap
   set whichwrap+=<,>,h,l
   let old_wrapscan=&wrapscan
   let &wrapscan = 0
+  let old_ve = &ve
+  silent! call s:log.debug('old_ve='.old_ve)
+  set ve=
   let old_search=@/
   let old_line = line('.')
   let old_col = col('.')
@@ -130,8 +142,10 @@ function s:utils.UnderCursorStatement() dict
   let stop_col = 0
   while (start_line == 0)
     let result = search(';\|^\s*\/\s*$', 'beW')
+    silent! call s:log.debug('result first loop='.result)
     if result
       let syn = synIDattr(synIDtrans(synID(line("."), col("."), 1)), "name")  
+      silent! call s:log.debug('syn first loop='.syn)
       if syn == "Constant" || syn == 'Comment'
         " do  nothing
       else
@@ -147,17 +161,22 @@ function s:utils.UnderCursorStatement() dict
       let start_col = 1
     endif
   endwhile
+  silent! call s:log.debug('after first loop: start_line='.start_line.' start_col='.start_col)
   while (stop_line == 0)
     let result = search(';\|^\s*\/\s*$', 'Wc')
+    silent! call s:log.debug('result second loop='.result)
     if result
       let syn = synIDattr(synIDtrans(synID(line("."), col("."), 1)), "name")  
-      if syn == "Constant" || syn == "Comment"
+      silent! call s:log.debug('syn second loop='.syn)
+      let line = line('.')
+      let col = col('.')
+      if (syn == "Constant" || syn == "Comment") && ([line, col] != [line('$'), col('$')-1])
         " do nothing
         normal l
       else
         " if the delimitator is not within quotes or comments
-        let stop_line = line('.')
-        let stop_col = col('.') - 1
+        let stop_line = line
+        let stop_col = col
       endif
     else
       " set the begining of the statement at the very
@@ -167,23 +186,28 @@ function s:utils.UnderCursorStatement() dict
       let stop_col = col('.') 
     endif
   endwhile
-  " adjusting taking into account comments
-  exe 'normal ' . start_line . 'G0'
-  if start_col > 1
-    exe 'normal ' . ( start_col - 1 ) . 'l'
-  endif
-  call s:AdjustPosition('f')
-  let start_line = line('.')
-  let start_col = col('.')
-  exe 'normal ' . stop_line . 'G0'
-  if stop_col > 1
-    exe 'normal ' . ( stop_col - 1 ) . 'l'
-  endif
-  call s:AdjustPosition('b')
-  let stop_line = line('.')
-  if stop_col > 1
-    let stop_col = col('.') - 1
-  endif
+  silent! call s:log.debug('after second loop: stop_line='.stop_line.' stop_col='.stop_col)
+  if a:adjust
+    " adjusting taking into account comments
+    exe 'normal ' . start_line . 'G0'
+    if start_col > 1
+      exe 'normal ' . ( start_col - 1 ) . 'l'
+    endif
+    call s:AdjustPosition('f')
+    let start_line = line('.')
+    let start_col = col('.')
+    silent! call s:log.debug('after adjusting forward: start_line='.start_line.' start_col='.start_col)
+    exe 'normal ' . stop_line . 'G0'
+    if stop_col > 1
+      exe 'normal ' . ( stop_col - 1 ) . 'l'
+    endif
+    call s:AdjustPosition('b')
+    let stop_line = line('.')
+    if stop_col > 1
+      let stop_col = col('.') - 1
+    endif
+    silent! call s:log.debug('after adjusting backward: stop_line='.stop_line.' stop_col='.stop_col)
+  end
   " extract the actual statement
   let statement = ""
   for line in getline(start_line, stop_line)
@@ -213,76 +237,95 @@ function s:utils.UnderCursorStatement() dict
   let @/=old_search
   let retval = [start_line, start_col, stop_line, stop_col, statement, rel_pos]
   exe 'set whichwrap=' . whichwrap_bak
+  exe 'set ve=' . old_ve
   silent! call s:log.trace('end of s:utils.UnderCursorStatement: returned value=' . string(retval))
   return retval
+endfunction
+
+function s:utils.CreateStandardMappings() dict
+  if g:vorax_key_for_describe != ""
+    if maparg(g:vorax_key_for_describe, 'n') == ""
+      exe "nmap <buffer> <unique> " . g:vorax_key_for_describe . " :VoraxDescribe<cr>"
+    endif
+
+    if maparg(g:vorax_key_for_describe, 'v') == ""
+      exe "xmap <buffer> <unique> " . g:vorax_key_for_describe " :VoraxDescribeVisual<cr>"
+    endif
+  endif
+
+  if g:vorax_key_for_describe_verbose != ""
+    if maparg(g:vorax_key_for_describe_verbose, 'n') == ""
+      exe "nmap <buffer> <unique> " . g:vorax_key_for_describe_verbose . " :VoraxDescribeVerbose<cr>"
+    endif
+
+    if maparg(g:vorax_key_for_describe_verbose, 'v') == ""
+      exe "xmap <buffer> <unique> " . g:vorax_key_for_describe_verbose . " :VoraxDescribeVerboseVisual<cr>"
+    endif
+  endif
+
+  if g:vorax_key_for_goto_def != "" && maparg(g:vorax_key_for_goto_def, 'n') == ""
+    exe "nmap <buffer> <unique> " . g:vorax_key_for_goto_def . " :VoraxGotoDefinition<cr>"
+  endif
+
+  " mapping for get help for the word under cursor
+  if g:vorax_key_for_oradoc_under_cursor != ""
+    exe "nmap <buffer> " . g:vorax_key_for_oradoc_under_cursor . " :call vorax#OradocSearch(expand('<cword>'))<cr>"
+    exe "xmap <buffer> " . g:vorax_key_for_oradoc_under_cursor . " :call vorax#OradocSearch(vorax#SelectedBlock())<cr>"
+  end
 endfunction
 
 " Create the mappings for a vorax buffer.
 function s:utils.CreateBufferMappings() dict
   " defines vorax mappings for the current buffer
-  if maparg('<Leader>vl', 'i') == ""
-    imap <buffer> <unique> <Leader>vl <Esc>:VoraxSearch<cr>
+  if g:vorax_key_for_fuzzy_search != "" && maparg(g:vorax_key_for_fuzzy_search, 'i') == ""
+    exe "imap <buffer> <unique> " . g:vorax_key_for_fuzzy_search . " <Esc>:VoraxSearch<cr>"
   endif
 
-  if maparg('<Leader>ve', 'n') == ""
-    nmap <buffer> <unique> <Leader>ve :VoraxExecUnderCursor<cr>
+  if g:vorax_key_for_exec_sql != "" 
+  	if maparg(g:vorax_key_for_exec_sql, 'n') == ""
+      exe "nmap <buffer> <unique> " . g:vorax_key_for_exec_sql . " :VoraxExecUnderCursor<cr>"
+    endif
+
+    if maparg(g:vorax_key_for_exec_sql, 'v') == ""
+      exe "xmap <buffer> <unique> " . g:vorax_key_for_exec_sql . " :VoraxExecVisualSQL<cr>"
+    endif
   endif
 
-  if maparg('<Leader>ve', 'v') == ""
-    xmap <buffer> <unique> <Leader>ve :VoraxExecVisualSQL<cr>
+  if g:vorax_key_for_exec_one != ""
+    if maparg(g:vorax_key_for_exec_one, 'n') == ""
+      exe "nmap <buffer> <unique> " . g:vorax_key_for_exec_one . " :VoraxQueryVerticalLayout<cr>"
+    endif
+
+    if maparg(g:vorax_key_for_exec_one, 'v') == ""
+      exe "xmap <buffer> <unique> " . g:vorax_key_for_exec_one . " :VoraxQueryVerticalLayoutVisual<cr>"
+    endif
   endif
 
-  if maparg('<Leader>v1', 'n') == ""
-    nmap <buffer> <unique> <Leader>v1 :VoraxQueryVerticalLayout<cr>
+  if g:vorax_key_for_explain_plan != ""
+    if maparg(g:vorax_key_for_explain_plan, 'n') == ""
+      exe "nmap <buffer> <unique> " . g:vorax_key_for_explain_plan . " :VoraxExplainUnderCursor<cr>"
+    endif
+
+    if maparg(g:vorax_key_for_explain_plan, 'v') == ""
+      exe "xmap <buffer> <unique> " . g:vorax_key_for_explain_plan . " :VoraxExplainVisualSQL<cr>"
+    endif
   endif
 
-  if maparg('<Leader>v1', 'v') == ""
-    xmap <buffer> <unique> <Leader>v1 :VoraxQueryVerticalLayoutVisual<cr>
+  if g:vorax_key_for_explain_only != ""
+    if maparg(g:vorax_key_for_explain_only, 'n') == ""
+      exe "nmap <buffer> <unique> " . g:vorax_key_for_explain_only . " :VoraxExplainOnlyUnderCursor<cr>"
+    endif
+
+    if maparg(g:vorax_key_for_explain_only, 'v') == ""
+      exe "xmap <buffer> <unique> " . g:vorax_key_for_explain_only . " :VoraxExplainOnlyVisualSQL<cr>"
+    endif
   endif
 
-  if maparg('<Leader>vp', 'n') == ""
-    nmap <buffer> <unique> <Leader>vp :VoraxExplainUnderCursor<cr>
+  if g:vorax_key_for_exec_buffer != "" && maparg(g:vorax_key_for_exec_buffer, 'n') == ""
+    exe "nmap <buffer> <unique> " . g:vorax_key_for_exec_buffer . " :VoraxExecBuffer<cr>"
   endif
 
-  if maparg('<Leader>vpo', 'n') == ""
-    nmap <buffer> <unique> <Leader>vpo :VoraxExplainOnlyUnderCursor<cr>
-  endif
-
-  if maparg('<Leader>vp', 'v') == ""
-    xmap <buffer> <unique> <Leader>vp :VoraxExplainVisualSQL<cr>
-  endif
-
-  if maparg('<Leader>vpo', 'v') == ""
-    xmap <buffer> <unique> <Leader>vpo :VoraxExplainOnlyVisualSQL<cr>
-  endif
-
-  if maparg('<Leader>vb', 'n') == ""
-    nmap <buffer> <unique> <Leader>vb :VoraxExecBuffer<cr>
-  endif
-
-  if maparg('<Leader>vd', 'n') == ""
-    nmap <buffer> <unique> <Leader>vd :VoraxDescribe<cr>
-  endif
-
-  if maparg('<Leader>vdv', 'n') == ""
-    nmap <buffer> <unique> <Leader>vdv :VoraxDescribeVerbose<cr>
-  endif
-
-  if maparg('<Leader>vg', 'n') == ""
-    nmap <buffer> <unique> <Leader>vg :VoraxGotoDefinition<cr>
-  endif
-
-  if maparg('<Leader>vdv', 'v') == ""
-    xmap <buffer> <unique> <Leader>vdv :VoraxDescribeVerboseVisual<cr>
-  endif
-
-  if maparg('<Leader>vd', 'v') == ""
-    xmap <buffer> <unique> <Leader>vd :VoraxDescribeVisual<cr>
-  endif
-
-  " mapping for get help for the word under cursor
-  nmap <buffer> K :call vorax#OradocSearch(expand('<cword>'))<cr>
-  xmap <buffer> K :call vorax#OradocSearch(vorax#SelectedBlock())<cr>
+  call self.CreateStandardMappings()
 
   " User defined mappings
   let handler = Vorax_GetEventHandler()

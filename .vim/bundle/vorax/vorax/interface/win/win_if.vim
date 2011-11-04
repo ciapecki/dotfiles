@@ -3,12 +3,12 @@
 " License: Apache License 2.0
 
 " no multiple loads allowed
-if exists("g:win_interface")
+if exists("s:win_interface")
   finish
 endif
 
 " flag to signal this source was loaded
-let g:win_interface = 1
+let s:win_interface = 1
 
 if has('win32') || has('win64')
 
@@ -24,25 +24,22 @@ if has('win32') || has('win64')
   "load ruby library
   exe 'ruby require "' . substitute(s:vrx_lib, '\', '/', 'g') . '"'
 
-  " define the interface object
-  let s:interface = {'more' : 0, 'truncated' : 0, 'last_error' : ""}
+  "get common interface object
+  let s:common_if = Vorax_GetCommonInterface()
 
-  " the last line read
-  let s:last_line = ""
+  " define the interface object
+  let s:interface = {'more' : 0, 'truncated' : 0, 'last_error' : "", 'connected_to' : '@'}
 
   function s:interface.startup() dict
+    " stop the interface if already running
+    call self.shutdown()
     " startup the interface
     let self.last_error = ""
-    ruby $io = popen("sqlplus /nolog") rescue VIM::command("let self.last_error='" + $!.message.gsub(/'/, "''") + "'")
-    let s:last_line = ""
+    ruby $vorax_if = popen("sqlplus /nolog") rescue VIM::command("let self.last_error='" + $!.message.gsub(/'/, "''") + "'")
   endfunction
 
   function s:interface.send(command) dict
-    let self.last_error = ""
-    " send stuff to interface
-    ruby $io.write(VIM::evaluate('a:command') + "\n") rescue VIM::command("let self.last_error='" + $!.message.gsub(/'/, "''") + "'")
-    " signal that we might have output
-    let self.more = 1
+    call s:common_if.send(self, a:command)
   endfunction
 
   function s:interface.cancel() dict
@@ -55,7 +52,7 @@ if has('win32') || has('win64')
     " instance. That's the case just in Windows... Even it's a
     " huge drawback, the cancel operation is implemented quite
     " rude: kill running sqlplus process and start a new one.
-    silent! ruby Process.kill(9, $io.pid)
+    silent! ruby Process.kill(9, $vorax_if.pid)
     " return the status of the connection: 0 means it's not
     " safe to continue with this session and a reconnect must be
     " done; 1 means the session was successfully canceled and
@@ -64,52 +61,11 @@ if has('win32') || has('win64')
   endfunction
 
   function s:interface.read() dict
-    " read output
-    let output = []
-    ruby << EOF
-    begin
-      if buffer = $io.read
-        end_marker = VIM::evaluate('s:end_marker')
-        end_pattern = Regexp.new(end_marker + '$')
-        lines = buffer.gsub(/\r/, '').split(/\n/)
-        lines.map do |line| 
-          if VIM::evaluate('self.truncated') == 1
-            last_line = VIM::evaluate('s:last_line') + line
-          end
-          if end_pattern.match(last_line) || end_pattern.match(line)
-            VIM::command('let self.more = 0')
-            # consume the output after the marker
-            $io.read
-            break
-          else
-            l = line.gsub(/'/, "''")
-            VIM::command('let s:last_line = \'' + l + '\'')
-            VIM::command('call add(output, \'' + l + '\')')
-          end
-        end
-        if buffer[-1, 1] == "\n"
-          VIM::command('let self.truncated = 0')
-        else
-          VIM::command('let self.truncated = 1')
-        end
-      end
-    rescue
-      VIM::command("let self.last_error='" + $!.message.gsub(/'/, "''") + "'")
-    end
-EOF
-    return output
+    return s:common_if.read(self, s:end_marker)
   endfunction
 
   function s:interface.pack(command) dict
-    " remove trailing blanks from cmd
-    let dbcommand = substitute(a:command, '\_s*\_$', '', 'g')
-    " now, embed our command
-    let content = dbcommand . "\n"
-    " add the end marker
-    let content .= "prompt " . s:end_marker . "\n"
-    " write everything into a nice sql file
-    call writefile(split(content, '\n'), s:temp_in) 
-    return '@' . s:temp_in
+    return s:common_if.pack(self, a:command, s:end_marker, s:temp_in)
   endfunction
 
   function s:interface.convert_path(path) dict
@@ -117,15 +73,11 @@ EOF
   endfunction
 
   function s:interface.mark_end() dict
-    call self.send("\nprompt " . s:end_marker)
+    call self.send(s:common_if.eof(s:end_marker))
   endfunction
 
   function s:interface.shutdown() dict
-    " shutdown the interface
-    silent! ruby Process.kill(9, $io.pid) if $io
-    ruby $io = nil
-    " no garbage please: delete the temporary file, if any
-    call delete(s:temp_in)
+    call s:common_if.shutdown(s:temp_in)
   endfunction
 
   " register the interface

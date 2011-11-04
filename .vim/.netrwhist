@@ -1,5 +1,11 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhist_cnt =3
-let g:netrw_dirhist_1='/home/chris/.elinks'
-let g:netrw_dirhist_2='/mnt/sda6/home/chris/EMEA/emeadb11/PHONE_PKG_EMEADB'
-let g:netrw_dirhist_3='/etc/vpnc'
+let g:netrw_dirhist_cnt =9
+let g:netrw_dirhist_1='/mnt/sda6/home/chris/EMEA/GCMrequests/2011/05/0513.vinci_cms_cio'
+let g:netrw_dirhist_2='/mnt/sda6/home/chris/EMEA/GCMrequests/on_going/products'
+let g:netrw_dirhist_3='/home/chris/docs/2011/licznik_murnauer'
+let g:netrw_dirhist_4='/mnt/sda6/home/chris/staging/ruby/pusher'
+let g:netrw_dirhist_5='/home/chris/.purple/logs/jabber/krzysztof.cierpisz@oracle.com/amit.navapara@oracle.com'
+let g:netrw_dirhist_6='/mnt/sda6/home/chris/staging/ruby/pusher_db'
+let g:netrw_dirhist_7='/mnt/sda6/home/chris/staging/ruby/pusher_db/lib'
+let g:netrw_dirhist_8='/mnt/sda6/home/chris/staging/ruby/pusher_db'
+let g:netrw_dirhist_9='/home/chris/.rvm/log/ruby-1.9.3'

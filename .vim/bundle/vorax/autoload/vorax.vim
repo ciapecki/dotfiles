@@ -91,7 +91,7 @@ function! vorax#Exec(cmd, show, feedback)
         " the command is not provided... assume the under cursor
         " statement
         silent! call s:log.debug('No statement provided. Compute the one under cursor.')
-        let stmt = s:tk_utils.UnderCursorStatement()
+        let stmt = s:tk_utils.UnderCursorStatement(1)
         let dbcommand = stmt[4]
       endif
       " remove trailing blanks from cmd
@@ -327,7 +327,7 @@ function! vorax#QueryVerticalLayout(query)
     " the command is not provided... assume the under cursor
     " statement
     silent! call s:log.debug('No statement provided. Compute the one under cursor.')
-    let stmt = s:tk_utils.UnderCursorStatement()
+    let stmt = s:tk_utils.UnderCursorStatement(1)
     let query = stmt[4]
   else
   	let query = a:query
@@ -371,7 +371,7 @@ function! vorax#Explain(cmd, only)
     " the command is not provided... assume the under cursor
     " statement
     silent! call s:log.debug('No statement provided. Compute the one under cursor.')
-    let stmt = s:tk_utils.UnderCursorStatement()
+    let stmt = s:tk_utils.UnderCursorStatement(1)
     let dbcommand = stmt[4]
   endif
   " remove trailing blanks from cmd

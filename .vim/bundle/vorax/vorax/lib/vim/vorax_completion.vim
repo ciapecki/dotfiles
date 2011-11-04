@@ -10,6 +10,12 @@ endif
 " flag to signal this source was loaded
 let s:vorax_completion = 1
 
+" Enable logging
+if g:vorax_debug
+  silent! call log#init('ALL', ['~/vorax.log'])
+  silent! let s:log = log#getLogger(expand('<sfile>:t'))
+endif
+
 " sql/plsql/commands keywords
 let s:keywords = [ 
                   \ {'word' : '$$PLSQL_LINE', 'kind' : 'kyw', 'dup' : 1},
@@ -1319,6 +1325,7 @@ let s:db = Vorax_DbLayerToolkit()
 function! Vorax_Complete(findstart, base)
   " First pass through this function determines how much of the line should
   " be replaced by whatever is chosen from the completion list
+  silent! call s:log.trace('start of Vorax_Complete findstart=' . a:findstart . ' base='. a:base)
   if a:findstart
     " Locate the start of the item, including "."
     let line     = getline('.')
@@ -1326,7 +1333,9 @@ function! Vorax_Complete(findstart, base)
     let complete_from = -1
     let s:prefix   = ""
     let s:params = 0
-    let s:crr_statement = s:utils.UnderCursorStatement()
+    silent! call s:log.debug('before UnderCursorStatement')
+    let s:crr_statement = s:utils.UnderCursorStatement(0)
+    silent! call s:log.debug('UnderCursorStatement='.string(s:crr_statement))
     while start > 0
       if strpart(s:crr_statement[4], 0, s:crr_statement[5] - 1) =~ '[(,]\_s*$'
         " parameters completion

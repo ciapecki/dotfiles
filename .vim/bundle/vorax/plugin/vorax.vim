@@ -37,7 +37,7 @@ else
   endif
 endif
 
-let g:loaded_vorax = "2.5"
+let g:loaded_vorax = "2.8.5"
 let s:keep_cpo = &cpo
 set cpo&vim
 
@@ -46,7 +46,7 @@ set cpo&vim
 """""""""""""""""""""""""""""""""""
 if !exists('g:vorax_sqlplus_header')
   " a cr delimited list of commands to be executed into the sqlplus
-  " envirnoment before creating a new oracle session. These commands do not overide the
+  " environment before creating a new oracle session. These commands do not overide the
   " settings from the [g]login.sql file. If you want echoing for your commands then
   " add [set echo on\n] at the end of this header.
   let g:vorax_sqlplus_header = "set linesize 10000\n" .
@@ -163,6 +163,8 @@ if !exists('g:vorax_messages')
                         \  "help_search_error"                : "Error in search!",
                         \  "no_pattern"                       : "No pattern provided.",
                         \  "oradoc_prompt"                    : "OraDoc Search: ",
+                        \  "notification_start"               : "Monitor ON.",
+                        \  "notification_stop"                : "Monitor OFF.",
                         \}
 endif
 
@@ -254,6 +256,26 @@ if !exists('g:vorax_quickfixwin_command')
   let g:vorax_quickfixwin_command = 'botright cwindow'
 endif
 
+if !exists('g:vorax_monitor_end_exec')
+  " Whenever or not to notify when the execution of a statement is finished
+  let g:vorax_monitor_end_exec = 0
+endif
+
+if !exists('g:vorax_notify_command')
+  " How to notify the user.
+  let g:vorax_notify_command = 'echom "Ieeei, done!"'
+endif
+
+if !exists('g:vorax_notify_long_running')
+  " If the execution of a statement will last more seconds than it is
+  " specified by this setting then the g:vorax_notify_command will be 
+  " invoked, despite the g:vorax_monitor_end_exec is enabled or
+  " disabled. If g:vorax_notify_long_running is 0 (which means
+  " disabled) then the notification will be invoked only if
+  " g:vorax_monitor_end_exec is enabled.
+  let g:vorax_notify_long_running = 0
+endif
+
 if !exists('g:vorax_debug')
   " Whenever or not to write into a log file. This
   " feature relies to the existance of the log.vim
@@ -266,117 +288,186 @@ endif
 " Define commands
 """""""""""""""""""""""""""""""""""
 if !exists(':VoraxConnect')
-    command! -nargs=? VoraxConnect :call vorax#Connect(<q-args>)
-    nmap <unique> <script> <Plug>VoraxConnect :VoraxConnect<CR>
+  command! -nargs=? VoraxConnect :call vorax#Connect(<q-args>)
+  nmap <unique> <script> <Plug>VoraxConnect :VoraxConnect<CR>
 endif
 
 if !exists(':VoraxHelp')
-    command! -nargs=? VoraxHelp :call vorax#OradocSearch(<q-args>)
-    nmap <unique> <script> <Plug>VoraxHelp :VoraxHelp<CR>
+  command! -nargs=? VoraxHelp :call vorax#OradocSearch(<q-args>)
+  nmap <unique> <script> <Plug>VoraxHelp :VoraxHelp<CR>
 endif
 
 if !exists(':VoraxHelpBuildIndex')
-    command! -nargs=? -complete=file VoraxHelpBuildIndex :call vorax#OradocBuild(<q-args>)
-    nmap <unique> <script> <Plug>VoraxHelpBuildIndex :VoraxHelpBuildIndex<CR>
+  command! -nargs=? -complete=file VoraxHelpBuildIndex :call vorax#OradocBuild(<q-args>)
+  nmap <unique> <script> <Plug>VoraxHelpBuildIndex :VoraxHelpBuildIndex<CR>
 endif
 
 if !exists(':VoraxExecUnderCursor')
-    command! -nargs=0 VoraxExecUnderCursor :call vorax#Exec('', 1, "")
+  command! -nargs=0 VoraxExecUnderCursor :call vorax#Exec('', 1, "")
 endif
 
 if !exists(':VoraxExplainUnderCursor')
-    command! -nargs=0 VoraxExplainUnderCursor :call vorax#Explain('', 0)
+  command! -nargs=0 VoraxExplainUnderCursor :call vorax#Explain('', 0)
 endif
 
 if !exists(':VoraxExplainOnlyUnderCursor')
-    command! -nargs=0 VoraxExplainOnlyUnderCursor :call vorax#Explain('', 1)
+  command! -nargs=0 VoraxExplainOnlyUnderCursor :call vorax#Explain('', 1)
 endif
 
 if !exists(':VoraxExecBuffer')
-    command! -nargs=0 VoraxExecBuffer :call vorax#ExecBuffer()
+  command! -nargs=0 VoraxExecBuffer :call vorax#ExecBuffer()
 endif
 
 if !exists(':VoraxDbExplorer')
-    command! -nargs=0 VoraxDbExplorer :call vorax#DbExplorer()
-    nmap <unique> <script> <Plug>VoraxDbExplorer :VoraxDbExplorer<CR>
+  command! -nargs=0 VoraxDbExplorer :call vorax#DbExplorer()
+  nmap <unique> <script> <Plug>VoraxDbExplorer :VoraxDbExplorer<CR>
 endif
 
 if !exists(':VoraxExecVisualSQL')
-    command! -nargs=0 -range VoraxExecVisualSQL :call vorax#Exec(vorax#SelectedBlock(), 1, "")
+  command! -nargs=0 -range VoraxExecVisualSQL :call vorax#Exec(vorax#SelectedBlock(), 1, "")
 endif
 
 if !exists(':VoraxExplainVisualSQL')
-    command! -nargs=0 -range VoraxExplainVisualSQL :call vorax#Explain(vorax#SelectedBlock(), 0)
+  command! -nargs=0 -range VoraxExplainVisualSQL :call vorax#Explain(vorax#SelectedBlock(), 0)
 endif
 
 if !exists(':VoraxExplainOnlyVisualSQL')
-    command! -nargs=0 -range VoraxExplainOnlyVisualSQL :call vorax#Explain(vorax#SelectedBlock(), 1)
+  command! -nargs=0 -range VoraxExplainOnlyVisualSQL :call vorax#Explain(vorax#SelectedBlock(), 1)
 endif
 
 if !exists(':VoraxQueryVerticalLayout')
-    command! -nargs=0 VoraxQueryVerticalLayout :call vorax#QueryVerticalLayout('')
+  command! -nargs=0 VoraxQueryVerticalLayout :call vorax#QueryVerticalLayout('')
 endif
 
 if !exists(':VoraxQueryVerticalLayoutVisual')
-    command! -nargs=0 -range VoraxQueryVerticalLayoutVisual :call vorax#QueryVerticalLayout(vorax#SelectedBlock())
+  command! -nargs=0 -range VoraxQueryVerticalLayoutVisual :call vorax#QueryVerticalLayout(vorax#SelectedBlock())
 endif
 
 if exists(':VoraxDescribeVisual') != 2
-    command! -nargs=0 -range VoraxDescribeVisual :call vorax#Describe(vorax#SelectedBlock())
+  command! -nargs=0 -range VoraxDescribeVisual :call vorax#Describe(vorax#SelectedBlock())
 endif
 
 if exists(':VoraxDescribe') != 2
-    command! -nargs=? VoraxDescribe :call vorax#Describe(<q-args>)
+  command! -nargs=? VoraxDescribe :call vorax#Describe(<q-args>)
 endif
 
 if exists(':VoraxDescribeVerboseVisual') != 2
-    command! -nargs=0 -range VoraxDescribeVerboseVisual :call vorax#DescribeVerbose(vorax#SelectedBlock())
+  command! -nargs=0 -range VoraxDescribeVerboseVisual :call vorax#DescribeVerbose(vorax#SelectedBlock())
 endif
 
 if exists(':VoraxDescribeVerbose') != 2
-    command! -nargs=? VoraxDescribeVerbose :call vorax#DescribeVerbose(<q-args>)
+  command! -nargs=? VoraxDescribeVerbose :call vorax#DescribeVerbose(<q-args>)
 endif
 
 if !exists(':VoraxGotoDefinition')
-    command! -nargs=? VoraxGotoDefinition :call vorax#GotoDefinition(<q-args>)
+  command! -nargs=? VoraxGotoDefinition :call vorax#GotoDefinition(<q-args>)
 endif
 
 if !exists(':VoraxToggleConnWindow')
-    command! -nargs=0 VoraxToggleConnWindow :call vorax#ToggleConnWindow()
-    nmap <unique> <script> <Plug>VoraxToggleConnWindow :VoraxToggleConnWindow<CR>
+  command! -nargs=0 VoraxToggleConnWindow :call vorax#ToggleConnWindow()
+  nmap <unique> <script> <Plug>VoraxToggleConnWindow :VoraxToggleConnWindow<CR>
 endif
 
 if !exists(':VoraxToggleResultWindow')
-    command! -nargs=0 VoraxToggleResultWindow :call vorax#ToggleResultWindow()
-    nmap <unique> <script> <Plug>VoraxToggleResultWindow :VoraxToggleResultWindow<CR>
+  command! -nargs=0 VoraxToggleResultWindow :call vorax#ToggleResultWindow()
+  nmap <unique> <script> <Plug>VoraxToggleResultWindow :VoraxToggleResultWindow<CR>
 endif
 
 if !exists(':VoraxSearch')
-    command! -nargs=0 VoraxSearch :call vorax#Search()
+  command! -nargs=0 VoraxSearch :call vorax#Search()
 endif
+
 """""""""""""""""""""""""""""""""""
 " Define mappings
 """""""""""""""""""""""""""""""""""
-if !hasmapto('<Plug>VoraxConnect') && !hasmapto('<Leader>vc', 'n')
-    nmap <unique> <Leader>vc <Plug>VoraxConnect
+" connect key
+if !exists('g:vorax_key_for_connect')
+  let g:vorax_key_for_connect = "<Leader>vc"
+endif
+if g:vorax_key_for_connect != '' && !hasmapto('<Plug>VoraxConnect') && !hasmapto(g:vorax_key_for_connect, 'n')
+  exe "nmap <unique> " . g:vorax_key_for_connect . " <Plug>VoraxConnect"
 endif
 
-if !hasmapto('<Plug>VoraxHelp') && !hasmapto('<Leader>vh', 'n')
-    nmap <unique> <Leader>vh <Plug>VoraxHelp
+" invoke oradoc search
+if !exists('g:vorax_key_for_oradoc_search')
+  let g:vorax_key_for_oradoc_search = "<Leader>vh"
+endif
+if g:vorax_key_for_oradoc_search != '' && !hasmapto('<Plug>VoraxHelp') && !hasmapto(g:vorax_key_for_oradoc_search, 'n')
+  exe "nmap <unique> " . g:vorax_key_for_oradoc_search . " <Plug>VoraxHelp"
 endif
 
-if !hasmapto('<Plug>VoraxDbExplorer') && !hasmapto('<Leader>vv', 'n')
-    nmap <unique> <Leader>vv <Plug>VoraxDbExplorer
+" invoke db explorer
+if !exists('g:vorax_key_for_toggle_db_explorer')
+  let g:vorax_key_for_toggle_db_explorer = "<Leader>vv"
+endif
+if g:vorax_key_for_toggle_db_explorer != "" && !hasmapto('<Plug>VoraxDbExplorer') && !hasmapto(g:vorax_key_for_toggle_db_explorer, 'n')
+  exe "nmap <unique> " . g:vorax_key_for_toggle_db_explorer . " <Plug>VoraxDbExplorer"
 endif
 
-if !hasmapto('<Plug>VoraxToggleConnWindow') && !hasmapto('<Leader>vo', 'n')
-    nmap <unique> <Leader>vo <Plug>VoraxToggleConnWindow
+" invoke connection window
+if !exists('g:vorax_key_for_toggle_conn_window')
+  let g:vorax_key_for_toggle_conn_window = "<Leader>vo"
+endif
+if g:vorax_key_for_toggle_conn_window != "" && !hasmapto('<Plug>VoraxToggleConnWindow') && !hasmapto(g:vorax_key_for_toggle_conn_window, 'n')
+  exe "nmap <unique> " . g:vorax_key_for_toggle_conn_window . " <Plug>VoraxToggleConnWindow"
 endif
 
-if !hasmapto('<Plug>VoraxToggleResultWindow') && !hasmapto('<Leader>vr', 'n')
-    nmap <unique> <Leader>vr <Plug>VoraxToggleResultWindow
+" toggle result window
+if !exists('g:vorax_key_for_toggle_result_window')
+  let g:vorax_key_for_toggle_result_window = "<Leader>vr"
+endif
+if g:vorax_key_for_toggle_result_window != "" && !hasmapto('<Plug>VoraxToggleResultWindow') && !hasmapto('<Leader>vr', 'n')
+  exe "nmap <unique> " . g:vorax_key_for_toggle_result_window . " <Plug>VoraxToggleResultWindow"
 endif
 
+" define defaults for other key mappings
+if !exists('g:vorax_key_for_oradoc_under_cursor')
+  let g:vorax_key_for_oradoc_under_cursor = "K"
+endif
+
+if !exists('g:vorax_key_for_fuzzy_search')
+  let g:vorax_key_for_fuzzy_search = "<Leader>vl"
+endif
+
+if !exists('g:vorax_key_for_exec_sql')
+  let g:vorax_key_for_exec_sql = "<Leader>ve"
+endif
+
+if !exists('g:vorax_key_for_exec_one')
+  let g:vorax_key_for_exec_one = "<Leader>v1"
+endif
+
+if !exists('g:vorax_key_for_explain_plan')
+  let g:vorax_key_for_explain_plan = "<Leader>vp"
+endif
+
+if !exists('g:vorax_key_for_explain_only')
+  let g:vorax_key_for_explain_only = "<Leader>vpo"
+endif
+
+if !exists('g:vorax_key_for_exec_buffer')
+  let g:vorax_key_for_exec_buffer = "<Leader>vb"
+endif
+
+if !exists('g:vorax_key_for_describe')
+  let g:vorax_key_for_describe = "<Leader>vd"
+endif
+
+if !exists('g:vorax_key_for_describe_verbose')
+  let g:vorax_key_for_describe_verbose = "<Leader>vdv"
+endif
+
+if !exists('g:vorax_key_for_goto_def')
+  let g:vorax_key_for_goto_def = "<Leader>vg"
+endif
+
+if !exists('g:vorax_key_for_toggle_logging')
+  let g:vorax_key_for_toggle_logging = "L"
+endif
+
+if !exists('g:vorax_key_for_toggle_notify')
+  let g:vorax_key_for_toggle_notify = "M"
+endif
 """""""""""""""""""""""""""""""""""
 " Define autocmds
 """""""""""""""""""""""""""""""""""
@@ -454,6 +545,11 @@ endfunction
 function Vorax_GetInterface()
   return s:interface
 endfunction
+
+function s:Vorax_SwitchName(setting)
+  return a:setting ? 'ON' : 'OFF'
+endfunction
+
 
 let &cpo = s:keep_cpo
 unlet s:keep_cpo
